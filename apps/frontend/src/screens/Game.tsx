@@ -24,6 +24,7 @@ export const USER_TIMEOUT = 'user_timeout';
 export const GAME_TIME = 'game_time';
 export const GAME_ENDED = 'game_ended';
 export const EXIT_GAME = 'exit_game';
+// eslint-disable-next-line react-refresh/only-export-components
 export enum Result {
   WHITE_WINS = 'WHITE_WINS',
   BLACK_WINS = 'BLACK_WINS',
@@ -71,7 +72,7 @@ export const Game = () => {
   const [result, setResult] = useState<GameResult | null>(null);
   const [player1TimeConsumed, setPlayer1TimeConsumed] = useState(0);
   const [player2TimeConsumed, setPlayer2TimeConsumed] = useState(0);
-  const [gameID,setGameID] = useState("");
+  const [gameID, setGameID] = useState('');
   const setMoves = useSetRecoilState(movesAtom);
   const userSelectedMoveIndex = useRecoilValue(userSelectedMoveIndexAtom);
   const userSelectedMoveIndexRef = useRef(userSelectedMoveIndex);
@@ -95,7 +96,7 @@ export const Game = () => {
       switch (message.type) {
         case GAME_ADDED:
           setAdded(true);
-          setGameID((p)=>message.gameId);
+          setGameID((p) => message.gameId);
           break;
         case INIT_GAME:
           setBoard(chess.board());
@@ -107,8 +108,7 @@ export const Game = () => {
           });
           break;
         case MOVE:
-          const { move, player1TimeConsumed, player2TimeConsumed } =
-            message.payload;
+          const { move, player1TimeConsumed, player2TimeConsumed } = message.payload;
           setPlayer1TimeConsumed(player1TimeConsumed);
           setPlayer2TimeConsumed(player2TimeConsumed);
           if (userSelectedMoveIndexRef.current !== null) {
@@ -199,9 +199,11 @@ export const Game = () => {
           payload: {
             gameId,
           },
-        }),
+        })
       );
     }
+    // join and message handling depend on the socket; game id is read from the closure
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chess, socket]);
 
   useEffect(() => {
@@ -215,6 +217,8 @@ export const Game = () => {
       }, 100);
       return () => clearInterval(interval);
     }
+    // chess is read each tick and is stable for the life of the game
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [started, gameMetadata, user]);
 
   const getTimer = (timeConsumed: number) => {
@@ -238,7 +242,7 @@ export const Game = () => {
         payload: {
           gameId,
         },
-      }),
+      })
     );
     setMoves([]);
     navigate('/');
@@ -257,10 +261,7 @@ export const Game = () => {
       )}
       {started && (
         <div className="justify-center flex pt-4 text-white">
-          {(user.id === gameMetadata?.blackPlayer?.id ? 'b' : 'w') ===
-          chess.turn()
-            ? 'Your turn'
-            : "Opponent's turn"}
+          {(user.id === gameMetadata?.blackPlayer?.id ? 'b' : 'w') === chess.turn() ? 'Your turn' : "Opponent's turn"}
         </div>
       )}
       <div className="justify-center flex">
@@ -274,9 +275,7 @@ export const Game = () => {
                       <div className="flex justify-between">
                         <UserAvatar gameMetadata={gameMetadata} />
                         {getTimer(
-                          user.id === gameMetadata?.whitePlayer?.id
-                            ? player2TimeConsumed
-                            : player1TimeConsumed,
+                          user.id === gameMetadata?.whitePlayer?.id ? player2TimeConsumed : player1TimeConsumed
                         )}
                       </div>
                     </div>
@@ -286,9 +285,7 @@ export const Game = () => {
                       <ChessBoard
                         started={started}
                         gameId={gameId ?? ''}
-                        myColor={
-                          user.id === gameMetadata?.blackPlayer?.id ? 'b' : 'w'
-                        }
+                        myColor={user.id === gameMetadata?.blackPlayer?.id ? 'b' : 'w'}
                         chess={chess}
                         setBoard={setBoard}
                         socket={socket}
@@ -299,11 +296,7 @@ export const Game = () => {
                   {started && (
                     <div className="mt-4 flex justify-between">
                       <UserAvatar gameMetadata={gameMetadata} self />
-                      {getTimer(
-                        user.id === gameMetadata?.blackPlayer?.id
-                          ? player2TimeConsumed
-                          : player1TimeConsumed,
-                      )}
+                      {getTimer(user.id === gameMetadata?.blackPlayer?.id ? player2TimeConsumed : player1TimeConsumed)}
                     </div>
                   )}
                 </div>
@@ -313,9 +306,11 @@ export const Game = () => {
               {!started ? (
                 <div className="pt-8 flex justify-center w-full">
                   {added ? (
-                    <div className='flex flex-col items-center space-y-4 justify-center'>
-                      <div className="text-white"><Waitopponent/></div>
-                      <ShareGame gameId={gameID}/>
+                    <div className="flex flex-col items-center space-y-4 justify-center">
+                      <div className="text-white">
+                        <Waitopponent />
+                      </div>
+                      <ShareGame gameId={gameID} />
                     </div>
                   ) : (
                     gameId === 'random' && (
@@ -324,7 +319,7 @@ export const Game = () => {
                           socket.send(
                             JSON.stringify({
                               type: INIT_GAME,
-                            }),
+                            })
                           );
                         }}
                       >
@@ -348,4 +343,3 @@ export const Game = () => {
     </div>
   );
 };
-
