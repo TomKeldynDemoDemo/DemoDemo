@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "db:generate":"prisma generate",
+    "db:generate": "prisma generate",
     "db:push": "prisma db push --skip-generate",
     "test": "echo \"Error: no test specified\" && exit 1",
     "db:dev": "npx prisma migrate dev && npx prisma generate",
@@ -21,6 +21,7 @@
     "prisma": "^5.12.0"
   },
   "exports": {
-    "./client": "./src/index.ts"
+    "./client": "./src/index.ts",
+    "./gdpr": "./src/gdpr.ts"
   }
 }
