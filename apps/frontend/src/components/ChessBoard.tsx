@@ -6,7 +6,6 @@ import LegalMoveIndicator from './chess-board/LegalMoveIndicator';
 import ChessSquare from './chess-board/ChessSquare';
 import NumberNotation from './chess-board/NumberNotation';
 import { drawArrow } from '../utils/canvas';
-import useWindowSize from '../hooks/useWindowSize';
 import Confetti from 'react-confetti';
 import MoveSound from '/move.wav';
 import CaptureSound from '/capture.wav';
@@ -15,6 +14,7 @@ import { useRecoilState } from 'recoil';
 
 import { isBoardFlippedAtom, movesAtom, userSelectedMoveIndexAtom } from '@repo/store/chessBoard';
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function isPromoting(chess: Chess, from: Square, to: Square) {
   if (!from) {
     return false;
@@ -101,6 +101,8 @@ export const ChessBoard = memo(
       if (myColor === 'b') {
         setIsFlipped(true);
       }
+      // setIsFlipped is a stable Recoil setter
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [myColor]);
 
     const clearCanvas = () => {
@@ -165,6 +167,8 @@ export const ChessBoard = memo(
       } else {
         setLastMove(null);
       }
+      // clearCanvas closes over canvas state that should not retrigger this effect
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [moves]);
 
     useEffect(() => {
@@ -178,6 +182,7 @@ export const ChessBoard = memo(
         setBoard(chess.board());
         return;
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userSelectedMoveIndex]);
 
     useEffect(() => {
@@ -191,6 +196,7 @@ export const ChessBoard = memo(
       } else {
         setBoard(chess.board());
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [moves]);
 
     return (

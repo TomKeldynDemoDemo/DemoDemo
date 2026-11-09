@@ -12,7 +12,7 @@ export const UserAvatar = ({ gameMetadata, self }: UserAvatarProps) => {
   if (gameMetadata?.blackPlayer.id === user.id) {
     player = self ? gameMetadata.blackPlayer : gameMetadata.whitePlayer;
   } else {
-    player = self ? gameMetadata?.whitePlayer! : gameMetadata?.blackPlayer!;
+    player = self ? gameMetadata!.whitePlayer : gameMetadata!.blackPlayer;
   }
 
   return (
