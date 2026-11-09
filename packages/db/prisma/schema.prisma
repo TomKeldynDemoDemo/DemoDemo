@@ -9,16 +9,23 @@ datasource db {
 
 model User {
   id            String   @id @default(uuid())
-  username      String?   @unique
-  name          String?
-  email         String   @unique
-  provider      AuthProvider
-  password      String?
-  rating        Int      @default(1200)
-  gamesAsWhite  Game[]   @relation("GamesAsWhite")
-  gamesAsBlack  Game[]   @relation("GamesAsBlack")
-  createdAt     DateTime @default(now())
-  lastLogin     DateTime?
+  username             String?   @unique
+  name                 String?
+  email                String?   @unique
+  provider             AuthProvider
+  password             String?
+  nameLocked           Boolean   @default(false)
+  publicProfile        Boolean   @default(false)
+  processingRestricted Boolean   @default(false)
+  deletedAt            DateTime?
+  rating               Int       @default(1200)
+  gamesAsWhite         Game[]    @relation("GamesAsWhite")
+  gamesAsBlack         Game[]    @relation("GamesAsBlack")
+  consents             Consent[]
+  privacyRequests      PrivacyRequest[]
+  disclosures          RecipientDisclosure[]
+  createdAt            DateTime  @default(now())
+  lastLogin            DateTime?
 
   @@index([rating])
 }
@@ -58,6 +65,64 @@ model Move {
   san         String?   
 
   @@index([gameId])
+}
+
+model Consent {
+  id            String         @id @default(uuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id])
+  purpose       ConsentPurpose
+  granted       Boolean
+  policyVersion String
+  source        String
+  capturedAt    DateTime       @default(now())
+  withdrawnAt   DateTime?
+
+  @@index([userId, purpose])
+}
+
+model PrivacyRequest {
+  id          String               @id @default(uuid())
+  userId      String
+  user        User                 @relation(fields: [userId], references: [id])
+  kind        PrivacyRequestKind
+  status      PrivacyRequestStatus
+  reason      String?
+  createdAt   DateTime             @default(now())
+  completedAt DateTime?
+
+  @@index([userId, createdAt])
+}
+
+model RecipientDisclosure {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  recipient   String
+  dataAsset   String
+  disclosedAt DateTime  @default(now())
+  notifiedOf  String?
+  notifiedAt  DateTime?
+
+  @@index([userId])
+}
+
+enum ConsentPurpose {
+  PUBLIC_PROFILE
+}
+
+enum PrivacyRequestKind {
+  ACCESS
+  EXPORT
+  RECTIFY
+  ERASE
+  RESTRICT
+  OBJECT
+}
+
+enum PrivacyRequestStatus {
+  COMPLETED
+  REJECTED
 }
 
 enum GameStatus {

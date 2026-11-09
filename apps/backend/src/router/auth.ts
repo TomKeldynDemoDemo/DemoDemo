@@ -3,16 +3,15 @@ import passport from 'passport';
 import jwt from 'jsonwebtoken';
 import { db } from '../db';
 import { v4 as uuidv4 } from 'uuid';
-import { COOKIE_MAX_AGE } from '../consts';
+import { cookieFlags, required } from '../privacy/env';
+import { parseProfileEdit } from '@repo/db/gdpr';
+
 const router = Router();
 
-const CLIENT_URL =
-  process.env.AUTH_REDIRECT_URL ?? 'http://localhost:5173/game/random';
-const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
+const CLIENT_URL = process.env.AUTH_REDIRECT_URL ?? 'http://localhost:5173/game/random';
 
 interface userJwtClaims {
   userId: string;
-  name: string;
   isGuest?: boolean;
 }
 
@@ -23,73 +22,97 @@ interface UserDetails {
   isGuest?: boolean;
 }
 
-// this route is to be hit when the user wants to login as a guest
+function signToken(claims: userJwtClaims) {
+  return jwt.sign(claims, required('JWT_SECRET'));
+}
+
 router.post('/guest', async (req: Request, res: Response) => {
   const bodyData = req.body;
-  let guestUUID = 'guest-' + uuidv4();
+  const guestUUID = 'guest-' + uuidv4();
+  const submitted = typeof bodyData.name === 'string' ? bodyData.name : '';
+  const parsed = parseProfileEdit({ name: submitted || guestUUID });
+  const name = parsed.ok && parsed.name ? parsed.name : guestUUID;
 
   const user = await db.user.create({
     data: {
       username: guestUUID,
-      email: guestUUID + '@acme.example',
-      name: bodyData.name || guestUUID,
+      name,
       provider: 'GUEST',
+      lastLogin: new Date(),
     },
   });
 
-  const token = jwt.sign(
-    { userId: user.id, name: user.name, isGuest: true },
-    JWT_SECRET,
-  );
-  const UserDetails: UserDetails = {
+  const token = signToken({ userId: user.id, isGuest: true });
+  const details: UserDetails = {
     id: user.id,
-    name: user.name!,
-    token: token,
+    name: user.name ?? name,
+    token,
     isGuest: true,
   };
-  res.cookie('guest', token, { maxAge: COOKIE_MAX_AGE });
-  res.json(UserDetails);
+  res.cookie('guest', token, cookieFlags());
+  res.json(details);
 });
 
 router.get('/refresh', async (req: Request, res: Response) => {
   if (req.user) {
-    const user = req.user as UserDetails;
-
-    // Token is issued so it can be shared b/w HTTP and ws server
-    // Todo: Make this temporary and add refresh logic here
-
+    const sessionUser = req.user as { id: string };
     const userDb = await db.user.findFirst({
-      where: {
-        id: user.id,
-      },
+      where: { id: sessionUser.id },
     });
-
-    const token = jwt.sign({ userId: user.id, name: userDb?.name }, JWT_SECRET);
+    if (!userDb || userDb.deletedAt) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+    await db.user.update({
+      where: { id: userDb.id },
+      data: { lastLogin: new Date() },
+    });
+    const token = signToken({ userId: userDb.id, isGuest: false });
     res.json({
       token,
-      id: user.id,
-      name: userDb?.name,
+      id: userDb.id,
+      name: userDb.name,
     });
-  } else if (req.cookies && req.cookies.guest) {
-    const decoded = jwt.verify(req.cookies.guest, JWT_SECRET) as userJwtClaims;
-    const token = jwt.sign(
-      { userId: decoded.userId, name: decoded.name, isGuest: true },
-      JWT_SECRET,
-    );
-    let User: UserDetails = {
-      id: decoded.userId,
-      name: decoded.name,
-      token: token,
-      isGuest: true,
-    };
-    res.cookie('guest', token, { maxAge: COOKIE_MAX_AGE });
-    res.json(User);
-  } else {
-    res.status(401).json({ success: false, message: 'Unauthorized' });
+    return;
   }
+
+  if (req.cookies && req.cookies.guest) {
+    try {
+      const decoded = jwt.verify(req.cookies.guest, required('JWT_SECRET')) as userJwtClaims;
+      const userDb = await db.user.findFirst({
+        where: { id: decoded.userId },
+      });
+      if (!userDb || userDb.deletedAt) {
+        res.status(401).json({ success: false, message: 'Unauthorized' });
+        return;
+      }
+      await db.user.update({
+        where: { id: userDb.id },
+        data: { lastLogin: new Date() },
+      });
+      const token = signToken({
+        userId: userDb.id,
+        isGuest: userDb.provider === 'GUEST',
+      });
+      const details: UserDetails = {
+        id: userDb.id,
+        name: userDb.name ?? '',
+        token,
+        isGuest: userDb.provider === 'GUEST',
+      };
+      res.cookie('guest', token, cookieFlags());
+      res.json(details);
+      return;
+    } catch {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+  }
+
+  res.status(401).json({ success: false, message: 'Unauthorized' });
 });
 
-router.get('/login/failed', (req: Request, res: Response) => {
+router.get('/login/failed', (_req: Request, res: Response) => {
   res.status(401).json({ success: false, message: 'failure' });
 });
 
@@ -106,30 +129,24 @@ router.get('/logout', (req: Request, res: Response) => {
   });
 });
 
-router.get(
-  '/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] }),
-);
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 router.get(
   '/google/callback',
   passport.authenticate('google', {
     successRedirect: CLIENT_URL,
     failureRedirect: '/login/failed',
-  }),
+  })
 );
 
-router.get(
-  '/github',
-  passport.authenticate('github', { scope: ['read:user', 'user:email'] }),
-);
+router.get('/github', passport.authenticate('github', { scope: ['read:user', 'user:email'] }));
 
 router.get(
   '/github/callback',
   passport.authenticate('github', {
     successRedirect: CLIENT_URL,
     failureRedirect: '/login/failed',
-  }),
+  })
 );
 
 export default router;

@@ -18,6 +18,7 @@ import { db } from './db';
 import { socketManager, User } from './SocketManager';
 import { Square } from 'chess.js';
 import { GameStatus } from '@prisma/client';
+import { displayName } from '@repo/db/gdpr';
 
 export class GameManager {
   private games: Game[];
@@ -49,8 +50,26 @@ export class GameManager {
     this.games = this.games.filter((g) => g.gameId !== gameId);
   }
 
+  private async stopIfRestricted(user: User): Promise<boolean> {
+    const row = await db.user.findUnique({
+      where: { id: user.userId },
+      select: { deletedAt: true, processingRestricted: true },
+    });
+    if (row && !row.deletedAt && !row.processingRestricted) return false;
+    const game = this.games.find(
+      (candidate) => candidate.player1UserId === user.userId || candidate.player2UserId === user.userId
+    );
+    if (game) {
+      await game.exitGame(user);
+      this.removeGame(game.gameId);
+    }
+    user.socket.close();
+    return true;
+  }
+
   private addHandler(user: User) {
     user.socket.on('message', async (data) => {
+      if (await this.stopIfRestricted(user)) return;
       const message = JSON.parse(data.toString());
       if (message.type === INIT_GAME) {
         if (this.pendingGameId) {
@@ -67,7 +86,7 @@ export class GameManager {
                 payload: {
                   message: 'Trying to Connect with yourself?',
                 },
-              }),
+              })
             );
             return;
           }
@@ -83,8 +102,8 @@ export class GameManager {
             game.gameId,
             JSON.stringify({
               type: GAME_ADDED,
-              gameId:game.gameId,
-            }),
+              gameId: game.gameId,
+            })
           );
         }
       }
@@ -100,13 +119,13 @@ export class GameManager {
         }
       }
 
-      if (message.type === EXIT_GAME){
+      if (message.type === EXIT_GAME) {
         const gameId = message.payload.gameId;
         const game = this.games.find((game) => game.gameId === gameId);
 
         if (game) {
           game.exitGame(user);
-          this.removeGame(game.gameId)
+          this.removeGame(game.gameId);
         }
       }
 
@@ -131,7 +150,7 @@ export class GameManager {
         });
 
         // There is a game created but no second player available
-        
+
         if (availableGame && !availableGame.player2UserId) {
           socketManager.addUser(user, availableGame.gameId);
           await availableGame.updateSecondPlayer(user.userId);
@@ -142,28 +161,40 @@ export class GameManager {
           user.socket.send(
             JSON.stringify({
               type: GAME_NOT_FOUND,
-            }),
+            })
           );
           return;
         }
 
-        if(gameFromDb.status !== GameStatus.IN_PROGRESS) {
-          user.socket.send(JSON.stringify({
-            type: GAME_ENDED,
-            payload: {
-              result: gameFromDb.result,
-              status: gameFromDb.status,
-              moves: gameFromDb.moves,
-              blackPlayer: {
-                id: gameFromDb.blackPlayer.id,
-                name: gameFromDb.blackPlayer.name,
+        if (gameFromDb.status !== GameStatus.IN_PROGRESS) {
+          user.socket.send(
+            JSON.stringify({
+              type: GAME_ENDED,
+              payload: {
+                result: gameFromDb.result,
+                status: gameFromDb.status,
+                moves: gameFromDb.moves,
+                blackPlayer: {
+                  id: gameFromDb.blackPlayer.id,
+                  name: displayName({
+                    player: gameFromDb.blackPlayer,
+                    viewerId: user.userId,
+                    whiteId: gameFromDb.whitePlayerId,
+                    blackId: gameFromDb.blackPlayerId,
+                  }),
+                },
+                whitePlayer: {
+                  id: gameFromDb.whitePlayer.id,
+                  name: displayName({
+                    player: gameFromDb.whitePlayer,
+                    viewerId: user.userId,
+                    whiteId: gameFromDb.whitePlayerId,
+                    blackId: gameFromDb.blackPlayerId,
+                  }),
+                },
               },
-              whitePlayer: {
-                id: gameFromDb.whitePlayer.id,
-                name: gameFromDb.whitePlayer.name,
-              },
-            }
-          }));
+            })
+          );
           return;
         }
 
@@ -172,7 +203,7 @@ export class GameManager {
             gameFromDb?.whitePlayerId!,
             gameFromDb?.blackPlayerId!,
             gameFromDb.id,
-            gameFromDb.startAt,
+            gameFromDb.startAt
           );
           game.seedMoves(gameFromDb?.moves || []);
           this.games.push(game);
@@ -190,16 +221,26 @@ export class GameManager {
               moves: gameFromDb.moves,
               blackPlayer: {
                 id: gameFromDb.blackPlayer.id,
-                name: gameFromDb.blackPlayer.name,
+                name: displayName({
+                  player: gameFromDb.blackPlayer,
+                  viewerId: user.userId,
+                  whiteId: gameFromDb.whitePlayerId,
+                  blackId: gameFromDb.blackPlayerId,
+                }),
               },
               whitePlayer: {
                 id: gameFromDb.whitePlayer.id,
-                name: gameFromDb.whitePlayer.name,
+                name: displayName({
+                  player: gameFromDb.whitePlayer,
+                  viewerId: user.userId,
+                  whiteId: gameFromDb.whitePlayerId,
+                  blackId: gameFromDb.blackPlayerId,
+                }),
               },
               player1TimeConsumed: availableGame.getPlayer1TimeConsumed(),
               player2TimeConsumed: availableGame.getPlayer2TimeConsumed(),
             },
-          }),
+          })
         );
 
         socketManager.addUser(user, gameId);

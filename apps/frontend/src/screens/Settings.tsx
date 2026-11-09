@@ -1,4 +1,4 @@
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet } from 'react-router-dom';
 
 export const Settings = () => {
   return (
@@ -10,6 +10,9 @@ export const Settings = () => {
           <Link className="flex gap-2 items-center" to="themes">
             <img src="/theme.svg" className="w-8 h-8" alt="icon" />
             <span>Themes</span>
+          </Link>
+          <Link className="flex gap-2 items-center mt-4" to="privacy">
+            <span>Privacy</span>
           </Link>
         </div>
         <div className="flex-1">
