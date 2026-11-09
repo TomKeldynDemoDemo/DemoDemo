@@ -8,12 +8,14 @@ interface UserAvatarProps {
 
 export const UserAvatar = ({ gameMetadata, self }: UserAvatarProps) => {
   const user = useUser();
-  let player: Player;
-  if (gameMetadata?.blackPlayer.id === user.id) {
-    player = self ? gameMetadata.blackPlayer : gameMetadata.whitePlayer;
-  } else {
-    player = self ? gameMetadata?.whitePlayer! : gameMetadata?.blackPlayer!;
-  }
+  const viewingBlack = gameMetadata?.blackPlayer.id === user.id;
+  const player: Player | undefined = self
+    ? viewingBlack
+      ? gameMetadata?.blackPlayer
+      : gameMetadata?.whitePlayer
+    : viewingBlack
+      ? gameMetadata?.whitePlayer
+      : gameMetadata?.blackPlayer;
 
   return (
     <div className="text-white flex gap-2 ">
