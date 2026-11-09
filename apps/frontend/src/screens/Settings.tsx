@@ -1,43 +1,45 @@
-import { useState } from 'react';
-import { Link, Outlet } from 'react-router-dom';
+import { useState } from "react";
+import { Link, Outlet } from "react-router-dom";
 
-const API = import.meta.env.VITE_APP_BACKEND_URL ?? 'http://localhost:3000';
+const API = import.meta.env.VITE_APP_BACKEND_URL ?? "http://localhost:3000";
 
 export const Settings = () => {
-  const [backupId, setBackupId] = useState(() => sessionStorage.getItem('accountBackupId') ?? '');
-  const [status, setStatus] = useState('');
+  const [backupId, setBackupId] = useState(
+    () => sessionStorage.getItem("accountBackupId") ?? "",
+  );
+  const [status, setStatus] = useState("");
 
   async function deleteAccount() {
-    setStatus('');
+    setStatus("");
     const res = await fetch(`${API}/v1/me`, {
-      method: 'DELETE',
-      credentials: 'include',
+      method: "DELETE",
+      credentials: "include",
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setStatus(body.message ?? 'Could not delete the account');
+      setStatus(body.message ?? "Could not delete the account");
       return;
     }
-    sessionStorage.setItem('accountBackupId', body.backupId);
+    sessionStorage.setItem("accountBackupId", body.backupId);
     setBackupId(body.backupId);
-    setStatus('Account deleted. Use Undo delete if this was a mistake.');
+    setStatus("Account deleted. Use Undo delete if this was a mistake.");
   }
 
   async function undoDelete() {
-    setStatus('');
+    setStatus("");
     const res = await fetch(`${API}/v1/me/undo-delete`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ backupId }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setStatus(body.message ?? 'Could not restore the account');
+      setStatus(body.message ?? "Could not restore the account");
       return;
     }
-    sessionStorage.removeItem('accountBackupId');
-    setBackupId('');
+    sessionStorage.removeItem("accountBackupId");
+    setBackupId("");
     setStatus(`Restored ${body.name ?? body.email}.`);
   }
 
@@ -63,7 +65,12 @@ export const Settings = () => {
               <button type="button" className="underline" onClick={deleteAccount}>
                 Delete account
               </button>
-              <button type="button" className="underline disabled:opacity-40" onClick={undoDelete} disabled={!backupId}>
+              <button
+                type="button"
+                className="underline disabled:opacity-40"
+                onClick={undoDelete}
+                disabled={!backupId}
+              >
                 Undo delete
               </button>
             </div>
